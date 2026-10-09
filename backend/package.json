@@ -9,11 +9,10 @@
     "dev": "node --watch src/app.js"
   },
   "dependencies": {
-    "bcrypt": "^6.0.0",
+    "argon2": "^0.45.1",
     "cors": "^2.8.6",
-    "dotenv": "^16.6.1",
     "express": "^4.22.3",
-    "jsonwebtoken": "^9.0.3",
+    "jose": "^6.2.12",
     "pg": "^8.23.1"
   }
 }
