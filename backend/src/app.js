@@ -2,15 +2,19 @@ const express = require('express');
 const cors = require('cors')
 const db = require('./config/db');
 const authRoutes = require('./routes/auth');
+const seriesRoutes = require('./routes/series');
+const {checkContentType} = require('./middleware/contentType')
 const app = express();
 const port = process.env.PORT || 3000;
 
 
-app.use(cors())
+app.use(cors());
 app.use(express.json());
-
+app.use(checkContentType);
 
 app.use('/auth', authRoutes);
+app.use('/series', seriesRoutes);
+
 
 app.get('/health', async (req, res) => {
   try {

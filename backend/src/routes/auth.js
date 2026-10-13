@@ -2,7 +2,7 @@ const { SignJWT, decodeJwt } = require("jose");
 const argon2 = require("argon2");
 const express = require('express');
 const db = require('../config/db');
-const { sendProblem } = require('../utils/error.js')
+const { sendProblem } = require('../utils/error')
 const router = express.Router()
 const { authenticateAdmin, invalidateToken } = require('../middleware/auth.js')
 
