@@ -4,6 +4,60 @@ const { authenticateAdmin } = require('../middleware/auth');
 const { sendProblem } = require('../utils/error')
 const db = require('../config/db')
 
+
+router.get('/', async (req, res) => {
+    try {
+        const query = 'SELECT * FROM series ORDER BY id ASC';
+        const result = await db.query(query);
+        const body = result.rows.map((row) => {
+            return {
+                "name": row.series_name,
+                "minValue": parseFloat(row.min_value),
+                "maxValue": parseFloat(row.max_value),
+                "color": row.color,
+                "icon": row.icon,
+                "unit": row.unit,
+                "id": row.id
+            }
+        })
+        return res.status(200).json(body)
+    } catch (err) {
+        console.error('Błąd:', err);
+        return sendProblem(res, 500, 'Internal Server Error', 'Błąd serwera');
+    }
+})
+
+
+router.get('/:seriesId', async (req, res) => {
+    try {
+        const seriesId = req.params.seriesId
+        const query = 'SELECT * FROM series WHERE id=$1';
+        const result = await db.query(query,[seriesId]);
+
+        if(result.rowCount === 0){
+            return sendProblem(res, 404, 'Not Found','Nie znaleziono serii o podanym id')
+        }
+
+        const row = result.rows[0]
+       
+        const body = {
+                "name": row.series_name,
+                "minValue": parseFloat(row.min_value),
+                "maxValue": parseFloat(row.max_value),
+                "color": row.color,
+                "icon": row.icon,
+                "unit": row.unit,
+                "id": row.id
+            }
+        
+        return res.status(200).json(body)
+    } catch (err) {
+        console.error('Błąd:', err);
+        return sendProblem(res, 500, 'Internal Server Error', 'Błąd serwera');
+    }
+})
+
+
 router.post('/', authenticateAdmin, async (req, res) => {
 
     try {
@@ -57,8 +111,8 @@ router.post('/', authenticateAdmin, async (req, res) => {
             return sendProblem(res, 422, 'Unprocessable Entity', detail);
         }
 
-        const fIcon = icon ?? '' 
-        const fUnit = unit ?? '' 
+        const fIcon = icon ?? ''
+        const fUnit = unit ?? ''
 
         const query = `INSERT INTO series (series_name, min_value, max_value, 
         color, icon, unit) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`
@@ -80,14 +134,30 @@ router.post('/', authenticateAdmin, async (req, res) => {
             "id": serie.id
         }
 
-       res.setHeader('Location',`/api/series/${serie.id}`)
-       return res.status(201).json(responseBody)
+        res.setHeader('Location', `/api/series/${serie.id}`)
+        return res.status(201).json(responseBody)
 
     } catch (err) {
         console.error('Błąd:', err);
         return sendProblem(res, 500, 'Internal Server Error', 'Błąd serwera');
     }
 
+})
+
+router.delete('/:seriesId', authenticateAdmin, async (req, res) =>{
+    try{
+        const seriesId = req.params.seriesId;
+        const query = 'DELETE FROM series WHERE id = $1 RETURNING id';
+        const result = await db.query(query,[seriesId]);
+        if (result.rowCount === 0){
+            return sendProblem(res, 404, 'Not Found','Nie znaleziono serii o podanym id')
+        }
+
+        return res.status(204).send();
+    }catch (err) {
+        console.error('Błąd:', err);
+        return sendProblem(res, 500, 'Internal Server Error', 'Błąd serwera');
+    }
 })
 
 module.exports = router
