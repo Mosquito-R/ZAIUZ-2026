@@ -6,7 +6,7 @@ const checkContentType = (req, res, next) => {
     if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
         const contentType = req.headers['content-type']
 
-        if (!contentType === undefined || !contentType.toLowerCase().includes('application/json')) {
+        if (contentType  !== undefined && !contentType.toLowerCase().includes('application/json')) {
             return sendProblem(
                 res,
                 415,
@@ -15,6 +15,7 @@ const checkContentType = (req, res, next) => {
             );
         }
     }
+
     next();
 
 }

@@ -4,6 +4,7 @@ const db = require('./config/db');
 const authRoutes = require('./routes/auth');
 const seriesRoutes = require('./routes/series');
 const sensorsRoutes = require('./routes/sensors');
+const measurementsRoutes = require('./routes/measurements');
 const {checkContentType} = require('./middleware/contentType')
 const app = express();
 const port = process.env.PORT || 3000;
@@ -16,6 +17,7 @@ app.use(checkContentType);
 app.use('/auth', authRoutes);
 app.use('/series', seriesRoutes);
 app.use('/sensors', sensorsRoutes);
+app.use('/measurements', measurementsRoutes);
 
 app.get('/health', async (req, res) => {
   try {

@@ -58,7 +58,7 @@ router.get('/:seriesId', async (req, res) => {
 })
 
 
-router.post('/', authenticateAdmin, async (req, res) => {
+router.post('/',authenticateAdmin,  async (req, res) => {
 
     try {
         const body = req.body || {};

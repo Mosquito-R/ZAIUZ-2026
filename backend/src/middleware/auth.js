@@ -33,7 +33,6 @@ const invalidateToken = (token) => {
 }
 
 const authenticateAdmin = async (req, res, next) => {
-
     const authHeader = req.headers['authorization']
     const jwt = authHeader && authHeader.split(' ')[1];
     if (!jwt) {
@@ -58,6 +57,7 @@ const authenticateAdmin = async (req, res, next) => {
         const { payload } = await jwtVerify(jwt, secret)
         req.user = payload
         next()
+
     } catch (err) {
         return sendProblem(
             res,
