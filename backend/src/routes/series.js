@@ -160,4 +160,101 @@ router.delete('/:seriesId', authenticateAdmin, async (req, res) =>{
     }
 })
 
+router.put('/:seriesId', authenticateAdmin, async (req, res) =>{
+    try{
+        const seriesId = req.params.seriesId
+        const body = req.body || {};
+        const { name, minValue, maxValue, color, icon, unit } = body
+
+        const requiredFields = ["name", "minValue", "maxValue", "color"]
+        const missingFields = requiredFields.filter((field) => body[field] === undefined || body[field] === '')
+
+        if (missingFields.length > 0) {
+            const detail = `Brakujące lub puste pola: ${missingFields.join(', ')}.`
+            return sendProblem(res, 400, 'Bad Request', detail)
+        }
+
+        if (typeof minValue !== 'number' || typeof maxValue !== 'number'
+            || Number.isNaN(minValue) || Number.isNaN(maxValue)
+            || typeof name !== 'string' || typeof color !== 'string' ||
+            (icon !== undefined && typeof icon !== 'string')
+            || (unit !== undefined && typeof unit !== 'string')) {
+            return sendProblem(res, 400, 'Bad Request', 'Nieprawidłowe typy pól')
+        }
+
+        const regex = /^#[0-9A-Fa-f]{6}$/
+        const isColorValid = regex.test(color)
+
+        const details = []
+
+        if (name.length > 100) {
+            details.push('Nazwa serii przekracza 100 znaków')
+
+        }
+
+        if (minValue >= maxValue) {
+            details.push('Minimalna wartość musi być ściśle mniejsza od maksymalnej')
+        }
+
+        if (!isColorValid) {
+            details.push('Niepoprawny kolor')
+        }
+
+        if (icon !== undefined && icon.length > 20) {
+            details.push('Nazwa ikony przekracza 20 znaków')
+        }
+
+        if (unit !== undefined && unit.length > 20) {
+            details.push('Nazwa jednostki przekracza 20 znaków')
+        }
+
+        if (details.length > 0) {
+            const detail = details.join(', ')
+            return sendProblem(res, 422, 'Unprocessable Entity', detail);
+        }
+
+        const fIcon = icon ?? ''
+        const fUnit = unit ?? ''
+
+        const query = `SELECT MAX(measurement_value) AS max_value, MIN(measurement_value) AS min_value FROM measurements WHERE series_id = $1`;
+        const result = await db.query(query,[seriesId])
+
+        if (result.rowCount !== 0){
+            const {max_value, min_value} = result.rows[0];
+            if (max_value > maxValue || min_value < minValue ){
+                return sendProblem(res, 409, 'Conflict', 'Zmiana sprzeczna z obecnym stanem zasobu')
+            }
+        }
+
+        
+        const query2 = `UPDATE series SET series_name = $1, min_value = $2, max_value = $3, 
+        color = $4, icon = $5, unit = $6 WHERE id = $7 RETURNING *`
+        const result2 = await db.query(query2, [name, minValue, maxValue, color, fIcon, fUnit, seriesId])
+
+        if (result2.rowCount === 0) {
+            return sendProblem(res, 404, 'Not Found', 'Zasób nie istnieje');
+        }
+
+        const serie = result2.rows[0]
+
+        const responseBody = {
+            "name": serie.series_name,
+            "minValue": parseFloat(serie.min_value),
+            "maxValue": parseFloat(serie.max_value),
+            "color": serie.color,
+            "icon": serie.icon,
+            "unit": serie.unit,
+            "id": serie.id
+        }
+
+        return res.status(200).json(responseBody)
+
+
+    }catch(err){
+        console.error('Błąd:', err);
+        return sendProblem(res, 500, 'Internal Server Error', 'Błąd serwera');
+    }   
+
+})
+
 module.exports = router
