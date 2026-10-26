@@ -38,9 +38,11 @@ jobs:
           cache-dependency-path: 'backend/package-lock.json'
 
       - name: Install Dependencies
+        working-directory: ./backend
         run: npm ci
 
       - name: Run Linter & Tests
+        working-directory: ./backend
         run: |
           npm run lint --if-present
           npm test
