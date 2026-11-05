@@ -69,6 +69,6 @@ jobs:
           
             git pull origin main
             
-            docker compose up -d --build --remove-orphans
+            docker compose -f docker-compose.yaml -f compose.prod.yaml up -d --build --remove-orphans
             
             docker image prune -f
