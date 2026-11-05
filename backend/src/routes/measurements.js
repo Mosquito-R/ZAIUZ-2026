@@ -39,11 +39,14 @@ router.post('/', async (req, res) => {
         } else {
             const maxAllowedFuture = Date.now() + 5 * 60 * 1000;
             timestampDate = new Date(timestamp).getTime();
+            if (Number.isNaN(timestampDate)) {
+                return sendProblem(res, 400, 'Bad Request', 'Niepoprawny format daty ISO 8601');
+            }
             if (timestampDate > maxAllowedFuture) {
                 return sendProblem(res, 422, 'Unprocessable Entity', 'Wartość spoza zakresu');
             }
         }
-       
+
         if (value < min_value || value > max_value) {
             return sendProblem(res, 422, 'Unprocessable Entity', 'Wartość spoza zakresu');
         }
@@ -107,7 +110,7 @@ router.get('/:measurementId', async (req, res) => {
 
 router.get('/', async (req, res) => {
     try {
-        const {series, from, to, sort = "timestamp", limit = 1000} = req.query
+        const { series, from, to, sort = "timestamp", limit = 1000 } = req.query
 
         const whereClauses = [];
         const queryParams = [];
@@ -115,7 +118,7 @@ router.get('/', async (req, res) => {
 
         if (series !== undefined && series !== '') {
             const seriesIds = series.split(',').map(id => parseInt(id.trim(), 10));
-            
+
             if (seriesIds.some(id => Number.isNaN(id) || id <= 0)) {
                 return sendProblem(res, 400, 'Bad Request', 'Parametr "series" musi zawierać liczby całkowite rozdzielone przecinkami');
             }
@@ -125,7 +128,7 @@ router.get('/', async (req, res) => {
             paramIndex++;
         }
 
-        if (from !== undefined && from !== ''){
+        if (from !== undefined && from !== '') {
             const fromDate = new Date(from);
             if (Number.isNaN(fromDate.getTime())) {
                 return sendProblem(res, 400, 'Bad Request', 'Niepoprawny format parametru "from"');
@@ -135,7 +138,7 @@ router.get('/', async (req, res) => {
             paramIndex++;
         }
 
-        if (to !== undefined && from !== ''){
+        if (to !== undefined && from !== '') {
             const toDate = new Date(to);
             if (Number.isNaN(toDate.getTime())) {
                 return sendProblem(res, 400, 'Bad Request', 'Niepoprawny format parametru "to"');
@@ -144,8 +147,8 @@ router.get('/', async (req, res) => {
             queryParams.push(toDate.toISOString());
             paramIndex++;
         }
-        
-        if (sort !== 'timestamp' && sort !== '-timestamp'){
+
+        if (sort !== 'timestamp' && sort !== '-timestamp') {
             return sendProblem(res, 400, 'Bad Request', 'Niepoprawny format parametru "sort"');
         }
 
