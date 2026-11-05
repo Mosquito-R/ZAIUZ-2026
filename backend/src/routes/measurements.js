@@ -29,15 +29,17 @@ router.post('/', async (req, res) => {
 
 
         let timestampDate = new Date()
+
         if (!timestamp) {
             timestampDate = Date.now()
         } else {
+            const maxAllowedFuture = Date.now() + 5 * 60 * 1000;
             timestampDate = new Date(timestamp).getTime();
-            if (Date.now() - timestampDate < 5 * 60 * 1000) {
+            if (timestampDate > maxAllowedFuture) {
                 return sendProblem(res, 422, 'Unprocessable Entity', 'Wartość spoza zakresu');
             }
         }
-        console.log(new Date(timestampDate).toISOString())
+       
         if (value < min_value || value > max_value) {
             return sendProblem(res, 422, 'Unprocessable Entity', 'Wartość spoza zakresu');
         }
