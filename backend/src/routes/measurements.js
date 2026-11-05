@@ -27,6 +27,10 @@ router.post('/', async (req, res) => {
         const { id, series_id, min_value, max_value } = result.rows[0];
         const { value, timestamp } = req.body || {};
 
+        if (value === undefined || typeof value !== 'number' || Number.isNaN(value)) {
+            return sendProblem(res, 400, 'Bad Request', 'Niepoprawne żądanie (składnia, typy, brak pól, błędne parametry')
+        }
+
 
         let timestampDate = new Date()
 
