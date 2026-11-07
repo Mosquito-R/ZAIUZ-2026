@@ -4,6 +4,7 @@ import DataTable from './components/DataTable';
 import Filters from './components/Filters';
 import LoginModal from './components/LoginModal';
 import ChangePasswordModal from './components/ChangePasswordModal';
+import AdminSeries from './components/AdminSeries';
 import { seriesApi, measurementsApi, authApi, getToken } from './api/client';
 
 
@@ -16,6 +17,7 @@ export default function App() {
     const [isLoginOpen, setIsLoginOpen] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getToken()));
     const [isPasswordOpen, setIsPasswordOpen] = useState(false);
+    const [currentScreen, setCurrentScreen] = useState('main');
 
     const loadMeasurements = async (filters = {}) => {
         try {
@@ -48,6 +50,15 @@ export default function App() {
         setIsLoggedIn(false);
     };
 
+    const loadSeries = async () => {
+    try {
+      const data = await seriesApi.getAll();
+      setSeries(data);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
     return (
         <div className="container">
             <header>
@@ -56,6 +67,13 @@ export default function App() {
                     {isLoggedIn ? (
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                             <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>Admin</span>
+                            <button
+                                type="button"
+                                className={`btn ${currentScreen === 'series' ? 'btn-secondary' : ''}`}
+                                onClick={() => setCurrentScreen(currentScreen === 'series' ? 'main' : 'series')}
+                            >
+                                {currentScreen === 'series' ? 'Widok główny' : 'Zarządzaj seriami'}
+                            </button>
                             <button type="button" className="btn btn-secondary" onClick={() => setIsPasswordOpen(true)}>
                                 Zmień hasło
                             </button>
@@ -72,37 +90,46 @@ export default function App() {
             </header>
 
             <main>
-                <Filters series={series} onFilterChange={loadMeasurements} />
-
-                {loading ? (
-                    <div className="loading">Ładowanie pomiarów...</div>
-                ) : error ? (
-                    <div className="error-message">Błąd: {error}</div>
+                {currentScreen === 'series' && isLoggedIn ? (
+                    <AdminSeries
+                        seriesList={series}
+                        onSeriesUpdated={loadSeries}
+                        onBack={() => setCurrentScreen('main')}
+                    />
                 ) : (
                     <>
-                        <section className="card chart-section">
-                            <h2>Wykres pomiarów</h2>
-                            <ChartView
-                                series={series.filter((s) =>
-                                    measurements.some((m) => m.seriesId === s.id)
-                                )}
-                                measurements={measurements}
-                                selectedId={selectedMeasurementId}
-                            />
-                        </section>
+                        <Filters series={series} onFilterChange={loadMeasurements} />
 
-                        <section className="card table-section">
-                            <h2>Tabela wyników</h2>
-                            <DataTable
-                                series={series}
-                                measurements={measurements}
-                                selectedId={selectedMeasurementId}
-                                onSelectRecord={(id) => setSelectedMeasurementId(id)}
-                            />
-                        </section>
+                        {loading ? (
+                            <div className="loading">Ładowanie pomiarów...</div>
+                        ) : error ? (
+                            <div className="error-message">Błąd: {error}</div>
+                        ) : (
+                            <>
+                                <section className="card chart-section">
+                                    <h2>Wykres pomiarów</h2>
+                                    <ChartView
+                                        series={series.filter((s) => measurements.some((m) => m.seriesId === s.id))}
+                                        measurements={measurements}
+                                        selectedId={selectedMeasurementId}
+                                    />
+                                </section>
+
+                                <section className="card table-section">
+                                    <h2>Tabela wyników</h2>
+                                    <DataTable
+                                        series={series}
+                                        measurements={measurements}
+                                        selectedId={selectedMeasurementId}
+                                        onSelectRecord={(id) => setSelectedMeasurementId(id)}
+                                    />
+                                </section>
+                            </>
+                        )}
                     </>
                 )}
             </main>
+
             <LoginModal
                 isOpen={isLoginOpen}
                 onClose={() => setIsLoginOpen(false)}

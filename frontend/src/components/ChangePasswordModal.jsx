@@ -22,8 +22,8 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError('Nowe hasło powinno mieć co najmniej 6 znaków.');
+    if (newPassword.length < 8) {
+      setError('Nowe hasło powinno mieć co najmniej 8 znaków.');
       return;
     }
 
