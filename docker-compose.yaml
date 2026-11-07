@@ -31,7 +31,7 @@ services:
       postgres:
         condition: service_healthy
   nginx:
-    image: nginx:alpine
+    build: ./frontend
     container_name: nginx
     restart: always
     ports:
@@ -39,7 +39,6 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
-      - ./frontend:/usr/share/nginx/html:ro
       - ./certs:/etc/nginx/certs:ro
     depends_on:
       - backend
