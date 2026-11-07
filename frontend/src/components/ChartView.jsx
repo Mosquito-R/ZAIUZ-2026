@@ -22,6 +22,8 @@ ChartJS.register(
   Legend
 );
 
+//POINT_STYLES = ['circle', 'triangle', 'rect', 'rectRot', 'star', 'crossRot'];
+
 export default function ChartView({ series, measurements, selectedId }) {
   const datasets = series.map((s) => {
     const seriesMeasurements = measurements.filter((m) => m.seriesId === s.id);
@@ -35,6 +37,7 @@ export default function ChartView({ series, measurements, selectedId }) {
       })),
       borderColor: s.color,
       backgroundColor: s.color,
+      pointStyle: s.icon || 'circle',
       pointRadius: seriesMeasurements.map((m) => (m.id === selectedId ? 9 : 3)),
       pointHoverRadius: 8,
       pointBackgroundColor: seriesMeasurements.map((m) => (m.id === selectedId ? '#ff0000' : s.color))
@@ -44,6 +47,13 @@ export default function ChartView({ series, measurements, selectedId }) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          usePointStyle: true
+        }
+      }
+    },
     scales: {
       x: {
         type: 'time',
