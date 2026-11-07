@@ -6,4 +6,5 @@ services:
   nginx:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend:/usr/share/nginx/html:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro

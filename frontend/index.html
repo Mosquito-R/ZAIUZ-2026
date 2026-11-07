@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="System IoT Dashboard do wizualizacji i monitorowania szeregów czasowych z sensorów">
+  <title>IoT Dashboard — Prezentacja i analiza pomiarów IoT</title>
+
+  <!-- Arkusz stylów aplikacji (Flexbox/Grid, responsywność, WCAG 2.2 AA, wydruk) -->
+  <link rel="stylesheet" href="/css/style.css">
+
+  <!-- Biblioteka Chart.js + adapter skali czasowej -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+  <!-- Biblioteka Alpine.js (SPA, reaktywność) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+
+  <!-- Skrypty aplikacji -->
+  <script src="/js/api.js"></script>
+  <script src="/js/chart.js"></script>
+  <script src="/js/app.js"></script>
+</head>
+<body x-data="iotApp">
+
+  <!-- Pasek stanu ładowania (F9) -->
+  <div x-show="globalLoading" class="loading-bar" aria-live="polite" aria-label="Trwa ładowanie danych..."></div>
+
+  <!-- =========================================================================
+       NAGŁÓWEK / NAWIGACJA (Ukrywane w druku: F7, T7)
+       ========================================================================= -->
+  <header class="app-header no-print">
+    <div class="header-container">
+      <button type="button" class="logo-group" @click="currentView = 'dashboard'" aria-label="Przejdź do pulpitu głównego">
+        <span aria-hidden="true">📡</span>
+        <span>IoT Dashboard</span>
+      </button>
+
+      <nav class="nav-group" aria-label="Nawigacja główna">
+        <button type="button" class="btn"
+                :class="currentView === 'dashboard' ? 'btn-primary' : 'btn-secondary'"
+                @click="currentView = 'dashboard'">
+          Pulpit pomiarów
+        </button>
+
+        <!-- Menu dla zalogowanego administratora (F3, F8) -->
+        <template x-if="token">
+          <div class="nav-group">
+            <button type="button" class="btn"
+                    :class="currentView === 'series' ? 'btn-primary' : 'btn-secondary'"
+                    @click="currentView = 'series'">
+              Serie
+            </button>
+            <button type="button" class="btn"
+                    :class="currentView === 'sensors' ? 'btn-primary' : 'btn-secondary'"
+                    @click="currentView = 'sensors'">
+              Czujniki
+            </button>
+            <button type="button" class="btn"
+                    :class="currentView === 'password' ? 'btn-primary' : 'btn-secondary'"
+                    @click="currentView = 'password'">
+              Hasło
+            </button>
+            <button type="button" class="btn btn-danger" @click="handleLogout()" aria-label="Wyloguj się z panelu administratora">
+              Wyloguj (<span x-text="username"></span>)
+            </button>
+          </div>
+        </template>
+
+        <!-- Przycisk logowania dla czytelnika (F3, F8) -->
+        <template x-if="!token">
+          <button type="button" class="btn"
+                  :class="currentView === 'login' ? 'btn-primary' : 'btn-secondary'"
+                  @click="currentView = 'login'">
+            Logowanie admina
+          </button>
+        </template>
+      </nav>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       NAGŁÓWEK DRUKOWANIA (Widoczny wyłącznie podczas drukowania: F7, T7)
+       ========================================================================= -->
+  <div class="print-only">
+    <h1>Raport Pomiarów IoT — ZAIUZ</h1>
+    <p>Wygenerowano: <span x-text="new Date().toLocaleString('pl-PL')"></span></p>
+    <p>Aktywne serie pomiarowe: 
+      <span x-text="selectedSeries.map(id => getSeriesName(id)).join(', ') || 'Brak'"></span>
+    </p>
+  </div>
+
+  <!-- =========================================================================
+       GŁÓWNA TREŚĆ STRONY (SPA)
+       ========================================================================= -->
+  <main class="main-content">
+
+    <!-- =======================================================================
+         WIDOK 1: PULPIT GŁÓWNY (DASHBOARD) - Dostępny publicznie (F1-F7)
+         ======================================================================= -->
+    <section x-show="currentView === 'dashboard'" aria-labelledby="dashboard-heading">
+      <h2 id="dashboard-heading" class="visually-hidden" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0);">Pulpit prezentacji pomiarów</h2>
+
+      <!-- Karta filtrów (Ukrywana podczas drukowania: F5, F7) -->
+      <div class="card no-print">
+        <div class="card-header">
+          <h3 class="card-title">
+            <span aria-hidden="true">🔍</span> Filtrowanie i konfiguracja widoku
+          </h3>
+          <button type="button" class="btn btn-primary" @click="printDashboard()" aria-label="Wydrukuj skonfigurowany wykres i tabelę">
+            <span aria-hidden="true">🖨️</span> Drukuj raport
+          </button>
+        </div>
+
+        <div class="filter-grid">
+          <!-- Filtr zakresu dat: Od -->
+          <div class="form-group">
+            <label for="filterDateFrom" class="form-label">Data i czas początkowy (Od):</label>
+            <input type="datetime-local" id="filterDateFrom" class="form-input"
+                   x-model="dateFrom" @change="loadMeasurements()">
+          </div>
+
+          <!-- Filtr zakresu dat: Do -->
+          <div class="form-group">
+            <label for="filterDateTo" class="form-label">Data i czas końcowy (Do):</label>
+            <input type="datetime-local" id="filterDateTo" class="form-input"
+                   x-model="dateTo" @change="loadMeasurements()">
+          </div>
+
+          <!-- Przyciski szybkiego filtrowania -->
+          <div class="form-group" style="justify-content: flex-end;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary btn-sm" @click="selectAllSeries()">Zaznacz wszystkie</button>
+              <button type="button" class="btn btn-secondary btn-sm" @click="deselectAllSeries()">Odznacz wszystkie</button>
+              <button type="button" class="btn btn-secondary btn-sm" @click="loadMeasurements()">Odśwież dane</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wybór widocznych serii na wykresie (F2, F5) -->
+        <div style="margin-top: 1rem;">
+          <span class="form-label" id="series-label">Wybór widocznych serii pomiarowych:</span>
+          <div class="series-pills" role="group" aria-labelledby="series-label">
+            <template x-for="s in series" :key="s.id">
+              <label class="series-pill" :class="{ 'active': selectedSeries.includes(Number(s.id)) }">
+                <input type="checkbox" :value="s.id" :checked="selectedSeries.includes(Number(s.id))"
+                       @change="toggleSeries(s.id)" style="margin-right: 0.25rem;">
+                <span class="color-dot" :style="`background-color: ${s.color};`"></span>
+                <span x-text="s.name"></span>
+                <span class="form-help" x-text="s.unit ? `[${s.unit}]` : ''"></span>
+              </label>
+            </template>
+            <template x-if="series.length === 0">
+              <span class="form-help">Brak zdefiniowanych serii w systemie.</span>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Karta Wykresu (F2, F5, F6) -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <span aria-hidden="true">📈</span> Wykres przebiegu pomiarów w czasie
+          </h3>
+          <span class="form-help no-print">Kliknij punkt na wykresie, aby przejść do odpowiadającego wiersza w tabeli</span>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="mainChart" role="img" aria-label="Wykres liniowy pomiarów w czasie dla wybranych serii IoT"></canvas>
+        </div>
+      </div>
+
+      <!-- Karta Tabeli Pomiarów (F1, F2, F6) -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <span aria-hidden="true">📋</span> Tabela zarejestrowanych wyników
+          </h3>
+          <span class="form-help">
+            Wyświetlono: <strong x-text="measurements.length"></strong> pomiarów.
+            <span class="no-print">Kliknij dowolny rekord w tabeli, aby wyróżnić punkt na wykresie.</span>
+          </span>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="data-table" aria-label="Tabela pomiarów IoT">
+            <thead>
+              <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Czas pomiaru</th>
+                <th scope="col">Seria pomiarowa</th>
+                <th scope="col" style="text-align: right;">Wartość</th>
+                <th scope="col">ID Czujnika</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="m in measurements" :key="m.id">
+                <tr :id="`row-${m.id}`"
+                    :class="{ 'row-highlight': highlightedMeasurementId === m.id }"
+                    @click="onRowClick(m)"
+                    tabindex="0"
+                    @keydown.enter="onRowClick(m)"
+                    :aria-selected="highlightedMeasurementId === m.id">
+                  <td x-text="m.id"></td>
+                  <td x-text="formatDate(m.timestamp)"></td>
+                  <td>
+                    <span class="color-dot" :style="`background-color: ${getSeriesColor(m.seriesId)}; vertical-align: middle; margin-right: 0.35rem;`"></span>
+                    <span x-text="getSeriesName(m.seriesId)"></span>
+                  </td>
+                  <td class="numeric">
+                    <strong x-text="formatNumber(m.value)"></strong>
+                    <span x-text="getSeriesUnit(m.seriesId)"></span>
+                  </td>
+                  <td x-text="m.sensorId !== null ? `#${m.sensorId}` : '—'"></td>
+                </tr>
+              </template>
+              <template x-if="measurements.length === 0">
+                <tr>
+                  <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    Brak pomiarów dla podanych kryteriów filtrowania.
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =======================================================================
+         WIDOK 2: LOGOWANIE ADMINISTRATORA (F8)
+         ======================================================================= -->
+    <section x-show="currentView === 'login'" class="card" style="max-width: 440px; margin: 2rem auto;" aria-labelledby="login-heading">
+      <div class="card-header">
+        <h2 id="login-heading" class="card-title">🔐 Logowanie Administratora</h2>
+      </div>
+
+      <form @submit.prevent="handleLogin()" novalidate>
+        <div class="form-group">
+          <label for="loginUsername" class="form-label">Nazwa użytkownika:</label>
+          <input type="text" id="loginUsername" class="form-input" x-model="loginForm.username"
+                 required autocomplete="username" placeholder="Wprowadź login (np. admin)">
+        </div>
+
+        <div class="form-group">
+          <label for="loginPassword" class="form-label">Hasło:</label>
+          <input type="password" id="loginPassword" class="form-input" x-model="loginForm.password"
+                 required autocomplete="current-password" placeholder="Wprowadź hasło">
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+          <button type="submit" class="btn btn-primary" :disabled="loginForm.loading" style="flex: 1;">
+            <span x-text="loginForm.loading ? 'Logowanie...' : 'Zaloguj się'"></span>
+          </button>
+          <button type="button" class="btn btn-secondary" @click="currentView = 'dashboard'">
+            Anuluj
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- =======================================================================
+         WIDOK 3: ZARZĄDZANIE SERIAMI POMIAROWYMI (F3, F4)
+         ======================================================================= -->
+    <section x-show="currentView === 'series'" class="card" aria-labelledby="series-admin-heading">
+      <div class="card-header">
+        <h2 id="series-admin-heading" class="card-title">📊 Zarządzanie Seriami Pomiarowymi</h2>
+        <button type="button" class="btn btn-primary" @click="openCreateSeries()">
+          + Dodaj nową serię
+        </button>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table" aria-label="Tabela serii pomiarowych">
+          <thead>
+            <tr>
+              <th scope="col">ID</th>
+              <th scope="col">Nazwa serii</th>
+              <th scope="col">Zakres dopuszczalny (min / max)</th>
+              <th scope="col">Kolor cechy</th>
+              <th scope="col">Jednostka</th>
+              <th scope="col">Ikona</th>
+              <th scope="col" style="text-align: right;">Akcje</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="s in series" :key="s.id">
+              <tr>
+                <td x-text="s.id"></td>
+                <td><strong x-text="s.name"></strong></td>
+                <td>
+                  <span x-text="`${formatNumber(s.minValue)} — ${formatNumber(s.maxValue)}`"></span>
+                  <span x-text="s.unit ? ` ${s.unit}` : ''"></span>
+                </td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span class="color-dot" :style="`background-color: ${s.color};`"></span>
+                    <code x-text="s.color"></code>
+                  </div>
+                </td>
+                <td x-text="s.unit || '—'"></td>
+                <td x-text="s.icon || '—'"></td>
+                <td style="text-align: right;">
+                  <button type="button" class="btn btn-secondary btn-sm" @click="openEditSeries(s)">Edytuj</button>
+                  <button type="button" class="btn btn-danger btn-sm" @click="handleDeleteSeries(s.id)">Usuń</button>
+                </td>
+              </tr>
+            </template>
+            <template x-if="series.length === 0">
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 2rem;">Brak zdefiniowanych serii.</td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =======================================================================
+         WIDOK 4: ZARZĄDZANIE CZUJNIKAMI (F12)
+         ======================================================================= -->
+    <section x-show="currentView === 'sensors'" class="card" aria-labelledby="sensors-admin-heading">
+      <div class="card-header">
+        <h2 id="sensors-admin-heading" class="card-title">📡 Zarządzanie Czujnikami (Sensory IoT)</h2>
+        <button type="button" class="btn btn-primary" @click="openCreateSensor()">
+          + Zarejestruj nowy czujnik
+        </button>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table" aria-label="Tabela czujników">
+          <thead>
+            <tr>
+              <th scope="col">ID</th>
+              <th scope="col">Nazwa czujnika</th>
+              <th scope="col">Przypisana seria</th>
+              <th scope="col">Data rejestracji</th>
+              <th scope="col">Ostatni pomiar</th>
+              <th scope="col" style="text-align: right;">Akcje</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="sn in sensors" :key="sn.id">
+              <tr>
+                <td x-text="sn.id"></td>
+                <td><strong x-text="sn.name"></strong></td>
+                <td>
+                  <span class="color-dot" :style="`background-color: ${getSeriesColor(sn.seriesId)}; vertical-align: middle; margin-right: 0.35rem;`"></span>
+                  <span x-text="getSeriesName(sn.seriesId)"></span>
+                </td>
+                <td x-text="formatDate(sn.createdAt)"></td>
+                <td x-text="sn.lastMeasurementAt ? formatDate(sn.lastMeasurementAt) : 'Brak danych'"></td>
+                <td style="text-align: right;">
+                  <button type="button" class="btn btn-danger btn-sm" @click="handleDeleteSensor(sn.id)">
+                    Wyrejestruj
+                  </button>
+                </td>
+              </tr>
+            </template>
+            <template x-if="sensors.length === 0">
+              <tr>
+                <td colspan="6" style="text-align: center; padding: 2rem;">Brak zarejestrowanych czujników.</td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =======================================================================
+         WIDOK 5: ZMIANA HASŁA ADMINISTRATORA (F8)
+         ======================================================================= -->
+    <section x-show="currentView === 'password'" class="card" style="max-width: 480px; margin: 2rem auto;" aria-labelledby="password-heading">
+      <div class="card-header">
+        <h2 id="password-heading" class="card-title">🔑 Zmiana Hasła Administratora</h2>
+      </div>
+
+      <form @submit.prevent="handleChangePassword()" novalidate>
+        <div class="form-group">
+          <label for="currentPassword" class="form-label">Aktualne hasło:</label>
+          <input type="password" id="currentPassword" class="form-input" x-model="passwordForm.currentPassword"
+                 required autocomplete="current-password">
+        </div>
+
+        <div class="form-group">
+          <label for="newPassword" class="form-label">Nowe hasło (min. 8 znaków):</label>
+          <input type="password" id="newPassword" class="form-input" x-model="passwordForm.newPassword"
+                 required minlength="8" autocomplete="new-password">
+        </div>
+
+        <div class="form-group">
+          <label for="confirmPassword" class="form-label">Powtórz nowe hasło:</label>
+          <input type="password" id="confirmPassword" class="form-input" x-model="passwordForm.confirmPassword"
+                 required minlength="8" autocomplete="new-password">
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+          <button type="submit" class="btn btn-primary" :disabled="passwordForm.loading" style="flex: 1;">
+            <span x-text="passwordForm.loading ? 'Zapisywanie...' : 'Zmień hasło'"></span>
+          </button>
+          <button type="button" class="btn btn-secondary" @click="currentView = 'dashboard'">
+            Anuluj
+          </button>
+        </div>
+      </form>
+    </section>
+
+  </main>
+
+  <!-- =========================================================================
+       MODALE / OKNA DIALOGOWE
+       ========================================================================= -->
+
+  <!-- Modal: Tworzenie / Edycja Serii (F3, F4) -->
+  <div x-show="seriesModalOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="series-modal-title">
+    <div class="modal-content" @click.outside="seriesModalOpen = false">
+      <div class="modal-header">
+        <h3 id="series-modal-title" class="card-title" x-text="editingSeriesId ? 'Edytuj serię pomiarową' : 'Dodaj nową serię pomiarową'"></h3>
+        <button type="button" class="toast-close" @click="seriesModalOpen = false" aria-label="Zamknij okno">✕</button>
+      </div>
+
+      <form @submit.prevent="handleSaveSeries()" novalidate>
+        <div class="form-group">
+          <label for="seriesName" class="form-label">Nazwa serii (maks. 100 znaków):</label>
+          <input type="text" id="seriesName" class="form-input" x-model="seriesForm.name" required maxlength="100" placeholder="np. Temperatura w serwerowni">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="form-group">
+            <label for="seriesMin" class="form-label">Wartość minimalna:</label>
+            <input type="number" step="any" id="seriesMin" class="form-input" x-model="seriesForm.minValue" required placeholder="np. -10">
+          </div>
+          <div class="form-group">
+            <label for="seriesMax" class="form-label">Wartość maksymalna:</label>
+            <input type="number" step="any" id="seriesMax" class="form-input" x-model="seriesForm.maxValue" required placeholder="np. 60">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="seriesColor" class="form-label">Kolor wykresu (Hex #RRGGBB):</label>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="color" id="seriesColorPicker" x-model="seriesForm.color" style="height: 38px; width: 50px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius);">
+            <input type="text" id="seriesColor" class="form-input" x-model="seriesForm.color" required pattern="^#[0-9A-Fa-f]{6}$" style="flex: 1;" placeholder="#2563eb">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="form-group">
+            <label for="seriesUnit" class="form-label">Jednostka (opcjonalna):</label>
+            <input type="text" id="seriesUnit" class="form-input" x-model="seriesForm.unit" maxlength="20" placeholder="np. °C, hPa, %">
+          </div>
+          <div class="form-group">
+            <label for="seriesIcon" class="form-label">Ikona (opcjonalna):</label>
+            <input type="text" id="seriesIcon" class="form-input" x-model="seriesForm.icon" maxlength="20" placeholder="np. termometr">
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem;">
+          <button type="button" class="btn btn-secondary" @click="seriesModalOpen = false">Anuluj</button>
+          <button type="submit" class="btn btn-primary" :disabled="seriesFormLoading">
+            <span x-text="seriesFormLoading ? 'Zapisywanie...' : 'Zapisz serię'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Rejestracja Nowego Czujnika (F12) -->
+  <div x-show="sensorModalOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="sensor-modal-title">
+    <div class="modal-content" @click.outside="sensorModalOpen = false">
+      <div class="modal-header">
+        <h3 id="sensor-modal-title" class="card-title">Rejestracja Nowego Czujnika IoT</h3>
+        <button type="button" class="toast-close" @click="sensorModalOpen = false" aria-label="Zamknij okno">✕</button>
+      </div>
+
+      <form @submit.prevent="handleSaveSensor()" novalidate>
+        <div class="form-group">
+          <label for="sensorName" class="form-label">Nazwa czujnika:</label>
+          <input type="text" id="sensorName" class="form-input" x-model="sensorForm.name" required placeholder="np. Czujnik A1 — Magazyn">
+        </div>
+
+        <div class="form-group">
+          <label for="sensorSeries" class="form-label">Przypisana seria pomiarowa:</label>
+          <select id="sensorSeries" class="form-select" x-model.number="sensorForm.seriesId" required>
+            <template x-for="s in series" :key="s.id">
+              <option :value="s.id" x-text="`${s.name} (zakres: ${s.minValue} - ${s.maxValue} ${s.unit || ''})`"></option>
+            </template>
+          </select>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem;">
+          <button type="button" class="btn btn-secondary" @click="sensorModalOpen = false">Anuluj</button>
+          <button type="submit" class="btn btn-primary" :disabled="sensorFormLoading">
+            <span x-text="sensorFormLoading ? 'Rejestrowanie...' : 'Zarejestruj czujnik'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Jednorazowe Wyświetlenie Klucza API (F12) -->
+  <div x-show="newSensorKeyModalOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="key-modal-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="key-modal-title" class="card-title" style="color: var(--success);">
+          <span aria-hidden="true">🔑</span> Klucz API zarejestrowanego czujnika
+        </h3>
+      </div>
+
+      <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">
+        Czujnik <strong><span x-text="newSensorData.name"></span></strong> został pomyślnie zarejestrowany.
+      </p>
+
+      <div class="toast-error" style="padding: 0.75rem; border-radius: var(--radius); margin-bottom: 0.75rem; font-size: 0.85rem;">
+        <strong>Uwaga:</strong> Ten klucz API jest wyświetlany <strong>wyłącznie raz</strong>. Skopiuj go teraz i zapisz w konfiguracji urządzenia lub generatora (F13).
+      </div>
+
+      <div class="api-key-box" x-text="newSensorData.apiKey"></div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+        <button type="button" class="btn btn-secondary" @click="copyApiKey()">
+          <span x-text="apiKeyCopied ? '✓ Skopiowano!' : '📋 Kopiuj klucz API'"></span>
+        </button>
+        <button type="button" class="btn btn-primary" @click="newSensorKeyModalOpen = false">
+          Rozumiem, zamknij
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       TOASTY / POWIADOMIENIA O BŁĘDACH I SUKCESACH (F9)
+       ========================================================================= -->
+  <div class="toast-container no-print" aria-live="polite">
+    <template x-for="t in toasts" :key="t.id">
+      <div class="toast" :class="t.type === 'success' ? 'toast-success' : 'toast-error'" role="alert">
+        <span x-text="t.message"></span>
+        <button type="button" class="toast-close" @click="removeToast(t.id)" aria-label="Zamknij powiadomienie">✕</button>
+      </div>
+    </template>
+  </div>
+
+</body>
+</html>
+
