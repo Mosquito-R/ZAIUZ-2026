@@ -24,8 +24,7 @@ app.use('/measurement', measurementsRoutes);
 
 app.get('/health', async (req, res) => {
   try {
-    const result = await db.query('SELECT NOW()');
-    res.json({ status: 'ok', db_time: result.rows[0].now });
+    res.json({ status: 'ok'});
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
