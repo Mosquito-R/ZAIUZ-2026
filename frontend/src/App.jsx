@@ -1,22 +1,52 @@
-import React, { useEffect } from 'react';
-import { seriesApi, measurementsApi, authApi } from './api/client';
+import React, { useState, useEffect } from 'react';
+import ChartView from './components/ChartView';
+import { seriesApi, measurementsApi } from './api/client';
 
 export default function App() {
+  const [series, setSeries] = useState([]);
+  const [measurements, setMeasurements] = useState([]);
+  const [selectedMeasurementId, setSelectedMeasurementId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   useEffect(() => {
-    async function runTest() {
-      console.log('--- TEST API CLIENT ---');
+    async function loadData() {
       try {
-        const series = await seriesApi.getAll();
-        console.log('✅ Serie:', series);
-        
-        const meas = await measurementsApi.get({ limit: 5 });
-        console.log('✅ Pomiary:', meas);
+        setLoading(true);
+        const [seriesData, measurementsData] = await Promise.all([
+          seriesApi.getAll(),
+          measurementsApi.get()
+        ]);
+        setSeries(seriesData);
+        setMeasurements(measurementsData);
       } catch (err) {
-        console.error('❌ Błąd testu:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
     }
-    runTest();
+    loadData();
   }, []);
 
-  return <h1>Testowanie Client API w przeglądarce...</h1>;
+  if (loading) return <div className="loading">Ładowanie pomiarów...</div>;
+  if (error) return <div className="error-message">Błąd: {error}</div>;
+
+  return (
+    <div className="container">
+      <header>
+        <h1>Serie Pomiarowe IoT</h1>
+      </header>
+
+      <main>
+        <section className="chart-section">
+          <h2>Wykres w funkcji czasu</h2>
+          <ChartView
+            series={series}
+            measurements={measurements}
+            selectedId={selectedMeasurementId}
+          />
+        </section>
+      </main>
+    </div>
+  );
 }
