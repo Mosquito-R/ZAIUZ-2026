@@ -1,19 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
+import { seriesApi, measurementsApi, authApi } from './api/client';
 
 export default function App() {
-  const [status, setStatus] = useState('Łączenie z API...');
-
   useEffect(() => {
-    fetch('/api/health')
-      .then((res) => res.json())
-      .then((data) => setStatus(`Backend status: ${data.status}`))
-      .catch(() => setStatus('Brak połączenia z /api/health'));
+    async function runTest() {
+      console.log('--- TEST API CLIENT ---');
+      try {
+        const series = await seriesApi.getAll();
+        console.log('✅ Serie:', series);
+        
+        const meas = await measurementsApi.get({ limit: 5 });
+        console.log('✅ Pomiary:', meas);
+      } catch (err) {
+        console.error('❌ Błąd testu:', err);
+      }
+    }
+    runTest();
   }, []);
 
-  return (
-    <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1>Hello World</h1>
-      <p>{status}</p>
-    </div>
-  );
+  return <h1>Testowanie Client API w przeglądarce...</h1>;
 }
