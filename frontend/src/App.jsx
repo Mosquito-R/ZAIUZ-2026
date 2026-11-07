@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ChartView from './components/ChartView';
+import DataTable from './components/DataTable';
 import { seriesApi, measurementsApi } from './api/client';
 
 export default function App() {
@@ -44,6 +45,15 @@ export default function App() {
             series={series}
             measurements={measurements}
             selectedId={selectedMeasurementId}
+          />
+        </section>
+        <section className="table-section">
+          <h2>Tabela wyników</h2>
+          <DataTable
+            series={series}
+            measurements={measurements}
+            selectedId={selectedMeasurementId}
+            onSelectRecord={(id) => setSelectedMeasurementId(id)}
           />
         </section>
       </main>

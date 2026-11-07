@@ -38,7 +38,7 @@ export default function ChartView({ series, measurements, selectedId }) {
       borderColor: s.color,
       backgroundColor: s.color,
       pointStyle: s.icon || 'circle',
-      pointRadius: seriesMeasurements.map((m) => (m.id === selectedId ? 9 : 3)),
+      pointRadius: seriesMeasurements.map((m) => (m.id === selectedId ? 10 : 5)),
       pointHoverRadius: 8,
       pointBackgroundColor: seriesMeasurements.map((m) => (m.id === selectedId ? '#ff0000' : s.color))
     };
