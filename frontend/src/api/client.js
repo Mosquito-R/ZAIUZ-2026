@@ -42,9 +42,7 @@ export async function fetchApi(endpoint, options = {}) {
       removeToken();
     }
 
-    const errorMessage =
-      (typeof data === 'object' && (data.detail || data.title)) ||
-      'Wystąpił nieoczekiwany błąd komunikacji z serwerem.';
+    const errorMessage =  response.status === 500 ? 'Wystąpił nieoczekiwany błąd komunikacji z serwerem.' : 'Błędny login lub hasło';
 
     const error = new Error(errorMessage);
     error.status = response.status;
