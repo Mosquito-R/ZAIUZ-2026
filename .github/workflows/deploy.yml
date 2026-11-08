@@ -19,6 +19,7 @@ jobs:
           openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
             -keyout certs/privkey.pem -out certs/fullchain.pem \
             -subj "/CN=localhost"
+          chmod 644 certs/privkey.pem certs/fullchain.pem
           cat <<EOF > .env
           POSTGRES_DB=test_db
           POSTGRES_USER=postgres
@@ -29,13 +30,21 @@ jobs:
         run: |
           docker compose -f docker-compose.yaml up -d --build
           # Czekamy na gotowość bazy i backendu przez Nginx
+          UP=0
           for i in {1..30}; do
             if curl -k -sf https://localhost/api/health > /dev/null; then
               echo "Stack is up!"
+              UP=1
               break
             fi
+            echo "Waiting for stack... ($i/30)"
             sleep 2
           done
+          if [ $UP -ne 1 ]; then
+            echo "Stack failed to start. Container logs:"
+            docker compose logs
+            exit 1
+          fi
       - name: Seed Admin Account & Sample Data (F11)
         run: |
           docker exec backend node -e '
@@ -85,6 +94,10 @@ jobs:
           
             git pull origin main
             
+            if [ -d "certs" ]; then
+            chmod 644 certs/*.pem 2>/dev/null || true
+            fi
+
             docker compose up -d --build --remove-orphans
             
             docker image prune -f
