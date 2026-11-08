@@ -8,44 +8,60 @@ on:
 
 jobs:
   test:
-    name: Run Tests
+    name: Run Full-Stack Integration Tests
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: test_db
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgrespassword
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: 'backend/package-lock.json'
-
-      - name: Install Dependencies
-        working-directory: ./backend
-        run: npm ci
+      - name: Generate Self-Signed Certs & .env for CI
+        run: |
+          mkdir -p certs
+          openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
+            -keyout certs/privkey.pem -out certs/fullchain.pem \
+            -subj "/CN=localhost"
+          cat <<EOF > .env
+          POSTGRES_DB=test_db
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=postgrespassword
+          JWT_SECRET=ci_test_secret_key_minimum_32_characters_long
+          EOF
+      - name: Start Docker Compose Stack
+        run: |
+          docker compose -f docker-compose.yaml up -d --build
+          # Czekamy na gotowość bazy i backendu przez Nginx
+          for i in {1..30}; do
+            if curl -k -sf https://localhost/api/health > /dev/null; then
+              echo "Stack is up!"
+              break
+            fi
+            sleep 2
+          done
+      - name: Seed Admin Account & Sample Data (F11)
+        run: |
+          docker exec backend node -e '
+            const argon2 = require("argon2");
+            const db = require("./src/config/db");
+            (async () => {
+              const hash = await argon2.hash("admin123");
+              await db.query(
+                "INSERT INTO admins (username, password_hash) VALUES ($1, $2) ON CONFLICT (username) DO NOTHING",
+                ["admin", hash]
+              );
+              await db.pool.end();
+            })();
+          '
+      - name: Run ZAI Automated Tests
         env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: test_db
-          DB_USER: postgres
-          DB_PASSWORD: postgrespassword
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: |
+          node zai-tests.mjs --app https://localhost --user admin --pass admin123 --stage E2 | tee test-output.txt
+          if grep -F "✘" test-output.txt | grep -v "F11"; then
+            echo "Testy nie powiodły się — blokuję wdrożenie!"
+            exit 1
+          fi
+      - name: Tear Down Stack
+        if: always()
+        run: docker compose -f docker-compose.yaml down -v
 
 
   deploy:
