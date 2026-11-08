@@ -75,7 +75,7 @@ export default function ChartView({ series, measurements, selectedId, onSelectMe
   };
 
   return (
-    <div className="chart-container" style={{ position: 'relative', height: '400px' }}>
+    <div className="chart-container">
       <Line data={{ datasets }} options={options} />
     </div>
   );
