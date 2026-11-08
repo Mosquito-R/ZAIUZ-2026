@@ -227,7 +227,7 @@ router.put('/:seriesId', authenticateAdmin, async (req, res) => {
         const query = `SELECT MAX(measurement_value) AS max_value, MIN(measurement_value) AS min_value FROM measurements WHERE series_id = $1`;
         const result = await db.query(query, [seriesId])
 
-        if (result.rowCount !== 0) {
+        if (result.rowCount !== 0 && result.rows[0].max_value !== null && result.rows[0].min_value !== null) {
             const { max_value, min_value } = result.rows[0];
             if (max_value > maxValue || min_value < minValue) {
                 return sendProblem(res, 409, 'Conflict', 'Zmiana sprzeczna z obecnym stanem zasobu')

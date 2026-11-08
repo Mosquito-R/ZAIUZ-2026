@@ -22,22 +22,23 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
       return;
     }
 
-    if (newPassword.length < 8) {
-      setError('Nowe hasło powinno mieć co najmniej 8 znaków.');
-      return;
+    const complexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/;
+    if (!complexityRegex.test(newPassword)) {
+      setError('Nowe hasło musi mieć min. 8 znaków oraz zawierać wielką literę, małą literę, cyfrę i znak specjalny.');
     }
-
     setLoading(true);
 
     try {
       await authApi.changePassword(currentPassword, newPassword);
-      setSuccessMsg('Hasło zostało pomyślnie zmienione.');
+      setSuccessMsg('Hasło zmienione. Następuje ponowne logowanie...');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setTimeout(() => {
         setSuccessMsg(null);
         onClose();
+        authApi.logout();
+        window.location.reload();
       }, 1500);
     } catch (err) {
       setError(err.message || 'Nie udało się zmienić hasła.');

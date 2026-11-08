@@ -65,7 +65,7 @@ export default function App() {
                 <h1>Serie Pomiarowe IoT</h1>
                 <div className="no-print">
                     {isLoggedIn ? (
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>Admin</span>
                             <button
                                 type="button"

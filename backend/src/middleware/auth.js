@@ -69,6 +69,7 @@ const authenticateAdmin = async (req, res, next) => {
         const secret = new TextEncoder().encode(process.env.JWT_SECRET);
         const { payload } = await jwtVerify(jwt, secret)
         req.user = payload
+        req.jwt = jwt
         next()
 
     } catch (err) {

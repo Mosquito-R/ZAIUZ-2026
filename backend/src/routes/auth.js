@@ -26,7 +26,7 @@ router.post('/login', async (req, res) => {
         const admin = result.rows[0]
 
         const hashToVerify = admin ? admin.password_hash : DUMMY_HASH;
-        const passwordValid = await argon2.verify(admin.password_hash, password)
+        const passwordValid = await argon2.verify(hashToVerify, password)
 
         if (!admin || !passwordValid) {
             return sendProblem(
@@ -83,9 +83,9 @@ router.post('/login', async (req, res) => {
 })
 
 router.post('/logout', authenticateAdmin, async (req, res) => {
-    const authHeader = req.headers['authorization'];
-    let jwt = authHeader && authHeader.split(' ')[1];
-    invalidateToken(jwt)
+
+    const jwt = req.jwt || (req.headers['authorization'] &&
+        req.headers['authorization'].split(' ')[1]);
     if (jwt) {
         invalidateToken(jwt);
     }

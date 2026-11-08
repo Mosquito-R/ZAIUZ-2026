@@ -43,9 +43,13 @@ export async function fetchApi(endpoint, options = {}) {
     if (response.status === 401) {
       removeToken();
     }
-
-    const errorMessage = response.status === 500 ? 'Wystąpił nieoczekiwany błąd komunikacji z serwerem.' : 'Błędny login lub hasło';
-
+    const problemDetail = data && typeof data === 'object' ? (data.detail || data.title) : null;
+    const errorMessage = problemDetail || (response.status === 500
+      ? 'Wystąpił nieoczekiwany błąd komunikacji z serwerem.'
+      : response.status === 401
+       ?'Błędny login lub hasło / sesja wygasła'
+       : `Wystąpił błąd podczas operacji (kod ${response.status})`);
+      
     const error = new Error(errorMessage);
     error.status = response.status;
     error.data = data;

@@ -7,6 +7,11 @@ export default function Filters({ series, onFilterChange }) {
     series.map((s) => String(s.id))
   );
 
+  React.useEffect(() => {
+    if (series.length > 0 && selectedSeries.length === 0) {
+      setSelectedSeries(series.map((s) => String(s.id)));
+    }
+  }, [series]);
   const handleSeriesToggle = (seriesId) => {
     const idStr = String(seriesId);
     setSelectedSeries((prev) =>
@@ -18,6 +23,10 @@ export default function Filters({ series, onFilterChange }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+        if (fromDate && toDate && new Date(fromDate) > new Date(toDate)) {
+      alert('Data początkowa (Od) nie może być późniejsza niż data końcowa (Do).');
+      return;
+    }
     onFilterChange({
       from: fromDate ? new Date(fromDate).toISOString() : '',
       to: toDate ? new Date(toDate).toISOString() : '',
