@@ -2,7 +2,7 @@ node_modules/
 .env
 *.log
 .vscode
-certs
+certs/
 .agents
 *.md
 !README.md
