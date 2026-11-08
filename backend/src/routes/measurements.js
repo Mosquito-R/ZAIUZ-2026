@@ -138,7 +138,7 @@ router.get('/', async (req, res) => {
             paramIndex++;
         }
 
-        if (to !== undefined && from !== '') {
+        if (to !== undefined && to !== '') {
             const toDate = new Date(to);
             if (Number.isNaN(toDate.getTime())) {
                 return sendProblem(res, 400, 'Bad Request', 'Niepoprawny format parametru "to"');
