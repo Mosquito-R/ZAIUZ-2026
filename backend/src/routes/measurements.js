@@ -1,6 +1,5 @@
 const express = require("express")
 const router = express.Router();
-const { authenticateAdmin } = require('../middleware/auth');
 const { sendProblem } = require('../utils/error')
 const db = require('../config/db');
 const { hashApiKey } = require("../utils/apiKey");

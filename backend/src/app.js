@@ -17,12 +17,13 @@ app.use(checkContentType);
 app.use(validateAcceptHeader);
 app.use(express.json());
 
-app.use('/auth', authRoutes);
-app.use('/series', seriesRoutes);
-app.use('/sensors', sensorsRoutes);
-app.use('/measurements', measurementsRoutes);
-app.use('/measurement', measurementsRoutes);
-app.get('/health',(req, res) => {res.json({ status: 'ok' });});
+app.use('/api/auth', authRoutes);
+app.use('/api/series', seriesRoutes);
+app.use('/api/sensors', sensorsRoutes);
+app.use('/api/measurements', measurementsRoutes);
+app.use('/api/measurement', measurementsRoutes);
+app.get('/api/health',(req, res) => {res.json({ status: 'ok' });});
+
 
 
 app.use((req, res) => {
