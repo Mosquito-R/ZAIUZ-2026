@@ -30,26 +30,29 @@ router.get('/', async (req, res) => {
 
 router.get('/:seriesId', async (req, res) => {
     try {
-        const seriesId = req.params.seriesId
+        const seriesId = parseInt(req.params.seriesId, 10);
+        if (Number.isNaN(seriesId) || seriesId<= 0) {
+            return sendProblem(res, 400, 'Bad Request', 'Identyfikator serii w URL musi być dodatnią liczbą całkowitą');
+        }
         const query = 'SELECT * FROM series WHERE id=$1';
-        const result = await db.query(query,[seriesId]);
+        const result = await db.query(query, [seriesId]);
 
-        if(result.rowCount === 0){
-            return sendProblem(res, 404, 'Not Found','Nie znaleziono serii o podanym id')
+        if (result.rowCount === 0) {
+            return sendProblem(res, 404, 'Not Found', 'Nie znaleziono serii o podanym id')
         }
 
         const row = result.rows[0]
-       
+
         const body = {
-                "name": row.series_name,
-                "minValue": parseFloat(row.min_value),
-                "maxValue": parseFloat(row.max_value),
-                "color": row.color,
-                "icon": row.icon,
-                "unit": row.unit,
-                "id": row.id
-            }
-        
+            "name": row.series_name,
+            "minValue": parseFloat(row.min_value),
+            "maxValue": parseFloat(row.max_value),
+            "color": row.color,
+            "icon": row.icon,
+            "unit": row.unit,
+            "id": row.id
+        }
+
         return res.status(200).json(body)
     } catch (err) {
         console.error('Błąd:', err);
@@ -58,7 +61,7 @@ router.get('/:seriesId', async (req, res) => {
 })
 
 
-router.post('/',authenticateAdmin,  async (req, res) => {
+router.post('/', authenticateAdmin, async (req, res) => {
 
     try {
         const body = req.body || {};
@@ -144,25 +147,31 @@ router.post('/',authenticateAdmin,  async (req, res) => {
 
 })
 
-router.delete('/:seriesId', authenticateAdmin, async (req, res) =>{
-    try{
-        const seriesId = req.params.seriesId;
+router.delete('/:seriesId', authenticateAdmin, async (req, res) => {
+    try {
+        const seriesId = parseInt(req.params.seriesId, 10);
+        if (Number.isNaN(seriesId) || seriesId <= 0) {
+            return sendProblem(res, 400, 'Bad Request', 'Identyfikator serii w URL musi być dodatnią liczbą całkowitą');
+        }
         const query = 'DELETE FROM series WHERE id = $1 RETURNING id';
-        const result = await db.query(query,[seriesId]);
-        if (result.rowCount === 0){
-            return sendProblem(res, 404, 'Not Found','Nie znaleziono serii o podanym id')
+        const result = await db.query(query, [seriesId]);
+        if (result.rowCount === 0) {
+            return sendProblem(res, 404, 'Not Found', 'Nie znaleziono serii o podanym id')
         }
 
         return res.status(204).send();
-    }catch (err) {
+    } catch (err) {
         console.error('Błąd:', err);
         return sendProblem(res, 500, 'Internal Server Error', 'Błąd serwera');
     }
 })
 
-router.put('/:seriesId', authenticateAdmin, async (req, res) =>{
-    try{
-        const seriesId = req.params.seriesId
+router.put('/:seriesId', authenticateAdmin, async (req, res) => {
+    try {
+        const seriesId = parseInt(req.params.seriesId, 10);
+        if (Number.isNaN(seriesId) || seriesId <= 0) {
+            return sendProblem(res, 400, 'Bad Request', 'Identyfikator serii w URL musi być dodatnią liczbą całkowitą');
+        }
         const body = req.body || {};
         const { name, minValue, maxValue, color, icon, unit } = body
 
@@ -184,7 +193,6 @@ router.put('/:seriesId', authenticateAdmin, async (req, res) =>{
 
         const regex = /^#[0-9A-Fa-f]{6}$/
         const isColorValid = regex.test(color)
-
         const details = []
 
         if (name.length > 100) {
@@ -217,16 +225,16 @@ router.put('/:seriesId', authenticateAdmin, async (req, res) =>{
         const fUnit = unit ?? ''
 
         const query = `SELECT MAX(measurement_value) AS max_value, MIN(measurement_value) AS min_value FROM measurements WHERE series_id = $1`;
-        const result = await db.query(query,[seriesId])
+        const result = await db.query(query, [seriesId])
 
-        if (result.rowCount !== 0){
-            const {max_value, min_value} = result.rows[0];
-            if (max_value > maxValue || min_value < minValue ){
+        if (result.rowCount !== 0) {
+            const { max_value, min_value } = result.rows[0];
+            if (max_value > maxValue || min_value < minValue) {
                 return sendProblem(res, 409, 'Conflict', 'Zmiana sprzeczna z obecnym stanem zasobu')
             }
         }
 
-        
+
         const query2 = `UPDATE series SET series_name = $1, min_value = $2, max_value = $3, 
         color = $4, icon = $5, unit = $6 WHERE id = $7 RETURNING *`
         const result2 = await db.query(query2, [name, minValue, maxValue, color, fIcon, fUnit, seriesId])
@@ -250,10 +258,10 @@ router.put('/:seriesId', authenticateAdmin, async (req, res) =>{
         return res.status(200).json(responseBody)
 
 
-    }catch(err){
+    } catch (err) {
         console.error('Błąd:', err);
         return sendProblem(res, 500, 'Internal Server Error', 'Błąd serwera');
-    }   
+    }
 
 })
 

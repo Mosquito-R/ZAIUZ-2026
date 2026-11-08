@@ -82,7 +82,10 @@ router.post('/', async (req, res) => {
 
 router.get('/:measurementId', async (req, res) => {
     try {
-        const measurementId = req.params.measurementId
+        const measurementId = parseInt(req.params.measurementId, 10);
+        if (Number.isNaN(measurementId) || measurementId  <= 0) {
+            return sendProblem(res, 400, 'Bad Request', 'Identyfikator pomiaru w URL musi być dodatnią liczbą całkowitą');
+        }
         const query = 'SELECT * FROM measurements WHERE id=$1';
         const result = await db.query(query, [measurementId]);
 

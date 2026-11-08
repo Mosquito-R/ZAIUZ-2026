@@ -28,26 +28,29 @@ router.get('/', authenticateAdmin, async (req, res) => {
 })
 
 
-router.get('/:sensorId',authenticateAdmin, async (req, res) => {
+router.get('/:sensorId', authenticateAdmin, async (req, res) => {
     try {
-        const sensorId = req.params.sensorId
+        const sensorId = parseInt(req.params.sensorId, 10);
+        if (Number.isNaN(sensorId) || sensorId <= 0) {
+            return sendProblem(res, 400, 'Bad Request', 'Identyfikator czujnika w URL musi być dodatnią liczbą całkowitą');
+        }
         const query = 'SELECT * FROM sensors WHERE id=$1';
-        const result = await db.query(query,[sensorId]);
+        const result = await db.query(query, [sensorId]);
 
-        if(result.rowCount === 0){
-            return sendProblem(res, 404, 'Not Found','Nie znaleziono czujnika o podanym id')
+        if (result.rowCount === 0) {
+            return sendProblem(res, 404, 'Not Found', 'Nie znaleziono czujnika o podanym id')
         }
 
         const row = result.rows[0]
-       
+
         const body = {
-                "id": row.id,
-                "name": row.sensor_name,
-                "seriesId": row.series_id,
-                "createdAt": row.created_at,
-                "lastMeasurementAt": row.last_measurement_at
-            }
-        
+            "id": row.id,
+            "name": row.sensor_name,
+            "seriesId": row.series_id,
+            "createdAt": row.created_at,
+            "lastMeasurementAt": row.last_measurement_at
+        }
+
         return res.status(200).json(body)
     } catch (err) {
         console.error('Błąd:', err);
@@ -102,7 +105,10 @@ router.post('/', authenticateAdmin, async (req, res) => {
 
 router.delete('/:sensorId', authenticateAdmin, async (req, res) => {
     try {
-        const sensorId = req.params.sensorId;
+        const sensorId = parseInt(req.params.sensorId, 10);
+        if (Number.isNaN(sensorId) || sensorId <= 0) {
+            return sendProblem(res, 400, 'Bad Request', 'Identyfikator czujnika w URL musi być dodatnią liczbą całkowitą');
+        }
         const query = 'DELETE FROM sensors WHERE id = $1 RETURNING id';
         const result = await db.query(query, [sensorId]);
         if (result.rowCount === 0) {
