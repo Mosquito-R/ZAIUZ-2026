@@ -1,4 +1,4 @@
-const { SignJWT} = require("jose");
+const { SignJWT } = require("jose");
 const argon2 = require("argon2");
 const express = require('express');
 const crypto = require('crypto');
@@ -41,35 +41,64 @@ router.post('/login', async (req, res) => {
                 .setProtectedHeader({ alg: 'HS256' })
                 .setJti(crypto.randomUUID())
                 .setIssuedAt()
-                .setExpirationTime('1h')
+                .setExpirationTime('15m')
                 .sign(secret);
 
-            return res.status(200).json({
-                accessToken: jwt,
-                tokenType: "Bearer",
-                expiresIn: 3600
-            })
-        } else {
-            return sendProblem(
-                res,
-                401,
-                'Unauthorized',
-                'Hasło nieprawidłowe lub użytkownik nie istnieje!'
-            );
+            res.cookie('auth_token', jwt, {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'strict',
+                maxAge: 900000, // 15 min
+                path: '/'
+            });
+
+            const isSpaClient = req.headers['x-requested-with'] === 'XMLHttpRequest'
+                || req.headers['x-client'] === 'spa';
+
+            if(isSpaClient) {
+    
+                return res.status(200).json({
+                    status: "ok",
+                    expiresIn: 3600
+                });
+            }
+
+                return res.status(200).json({
+                    accessToken: jwt,
+                    tokenType: "Bearer",
+                    expiresIn: 900
+                })
+            } else {
+                return sendProblem(
+                    res,
+                    401,
+                    'Unauthorized',
+                    'Hasło nieprawidłowe lub użytkownik nie istnieje!'
+                );
+            }
+
+
+
+        } catch (err) {
+            console.error('Błąd logowania:', err);
+            return sendProblem(res, 500, 'Internal Server Error', 'Błąd serwera');
         }
 
-
-
-    } catch (err) {
-        console.error('Błąd logowania:', err);
-        return sendProblem(res, 500, 'Internal Server Error', 'Błąd serwera');
-    }
-
-})
+    })
 
 router.post('/logout', authenticateAdmin, async (req, res) => {
-    const jwt = req.headers['authorization'].split(' ')[1];
+    const authHeader = req.headers['authorization'];
+    let jwt = authHeader && authHeader.split(' ')[1];
     invalidateToken(jwt)
+    if (jwt){
+        invalidateToken(jwt);
+    }
+    res.clearCookie('auth_token', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        path: '/'
+    });
     return res.status(204).send();
 })
 
@@ -83,7 +112,7 @@ router.put('/password', authenticateAdmin, async (req, res) => {
             return sendProblem(res, 400, 'Bad Request', 'Wymagane hasło oraz nowe hasło');
         }
 
-        if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' ){
+        if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
             return sendProblem(res, 400, 'Bad Request', 'Hasła muszą być ciągami znaków');
         }
 
@@ -100,7 +129,7 @@ router.put('/password', authenticateAdmin, async (req, res) => {
         const query = 'SELECT password_hash FROM admins WHERE id = $1'
         const result = await db.query(query, [adminId])
 
-        if (result.rowCount === 0){
+        if (result.rowCount === 0) {
             return sendProblem(res, 404, 'Not Found', 'Użytkownik nie istnieje');
         }
 
@@ -114,7 +143,7 @@ router.put('/password', authenticateAdmin, async (req, res) => {
         const newPasswordHash = await argon2.hash(newPassword)
 
         const query2 = 'UPDATE admins SET password_hash = $1 WHERE id = $2'
-        const result2 = await db.query(query2, [newPasswordHash, adminId ])
+        const result2 = await db.query(query2, [newPasswordHash, adminId])
 
         if (result2.rowCount === 0) {
             return sendProblem(res, 500, 'Internal Server Error', 'Nie udało się zaktualizować hasła');

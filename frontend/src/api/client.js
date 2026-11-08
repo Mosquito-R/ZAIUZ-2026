@@ -18,8 +18,10 @@ export async function fetchApi(endpoint, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+
   const config = {
     ...options,
+    credentials: 'include',
     headers,
   };
 
@@ -42,7 +44,7 @@ export async function fetchApi(endpoint, options = {}) {
       removeToken();
     }
 
-    const errorMessage =  response.status === 500 ? 'Wystąpił nieoczekiwany błąd komunikacji z serwerem.' : 'Błędny login lub hasło';
+    const errorMessage = response.status === 500 ? 'Wystąpił nieoczekiwany błąd komunikacji z serwerem.' : 'Błędny login lub hasło';
 
     const error = new Error(errorMessage);
     error.status = response.status;

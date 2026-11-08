@@ -34,7 +34,20 @@ const invalidateToken = (token) => {
 
 const authenticateAdmin = async (req, res, next) => {
     const authHeader = req.headers['authorization']
-    const jwt = authHeader && authHeader.split(' ')[1];
+    let jwt = authHeader && authHeader.split(' ')[1];
+
+
+    if (!jwt) {
+        if (req.cookies && req.cookies.auth_token) {
+            jwt = req.cookies.auth_token;
+        } else if (req.headers.cookie) {
+            const match = req.headers.cookie.match(/(?:^|;\s*)auth_token=([^;]+)/);
+            if (match) {
+                jwt = decodeURIComponent(match[1]);
+            }
+        }
+    }
+
     if (!jwt) {
         return sendProblem(
             res,
