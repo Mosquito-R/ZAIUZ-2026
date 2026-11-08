@@ -14,7 +14,7 @@ const invalidateToken = (token) => {
     try {
         const payload = decodeJwt(token);
         if (payload && payload.exp) {
-            const timeToLiveMs = payload.exp * 1000 - Date.Now();
+            const timeToLiveMs = payload.exp * 1000 - Date.now();
 
             if (timeToLiveMs > 0) {
                 setTimeout(() => {

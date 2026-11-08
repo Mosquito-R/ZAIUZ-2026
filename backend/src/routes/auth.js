@@ -6,6 +6,7 @@ const db = require('../config/db');
 const { sendProblem } = require('../utils/error')
 const router = express.Router()
 const { authenticateAdmin, invalidateToken } = require('../middleware/auth.js')
+const DUMMY_HASH = '$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$RdescudvJCsgqlfreSAeVoScLeaq4HHbgHJaYBgkBgQ';
 
 router.post('/login', async (req, res) => {
 
@@ -24,7 +25,10 @@ router.post('/login', async (req, res) => {
 
         const admin = result.rows[0]
 
-        if (!admin) {
+        const hashToVerify = admin ? admin.password_hash : DUMMY_HASH;
+        const passwordValid = await argon2.verify(admin.password_hash, password)
+
+        if (!admin || !passwordValid) {
             return sendProblem(
                 res,
                 401,
@@ -33,64 +37,56 @@ router.post('/login', async (req, res) => {
             );
         }
 
-        const passwordValid = await argon2.verify(admin.password_hash, password)
 
-        if (passwordValid) {
-            const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-            const jwt = await new SignJWT({ id: admin.id, username: username })
-                .setProtectedHeader({ alg: 'HS256' })
-                .setJti(crypto.randomUUID())
-                .setIssuedAt()
-                .setExpirationTime('15m')
-                .sign(secret);
 
-            res.cookie('auth_token', jwt, {
-                httpOnly: true,
-                secure: true,
-                sameSite: 'strict',
-                maxAge: 900000, // 15 min
-                path: '/'
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET)
+        const jwt = await new SignJWT({ id: admin.id, username: username })
+            .setProtectedHeader({ alg: 'HS256' })
+            .setJti(crypto.randomUUID())
+            .setIssuedAt()
+            .setExpirationTime('15m')
+            .sign(secret);
+
+        res.cookie('auth_token', jwt, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'strict',
+            maxAge: 900000, // 15 min
+            path: '/'
+        });
+
+        const isSpaClient = req.headers['x-requested-with'] === 'XMLHttpRequest'
+            || req.headers['x-client'] === 'spa';
+
+        if (isSpaClient) {
+
+            return res.status(200).json({
+                status: "ok",
+                expiresIn: 3600
             });
-
-            const isSpaClient = req.headers['x-requested-with'] === 'XMLHttpRequest'
-                || req.headers['x-client'] === 'spa';
-
-            if(isSpaClient) {
-    
-                return res.status(200).json({
-                    status: "ok",
-                    expiresIn: 3600
-                });
-            }
-
-                return res.status(200).json({
-                    accessToken: jwt,
-                    tokenType: "Bearer",
-                    expiresIn: 900
-                })
-            } else {
-                return sendProblem(
-                    res,
-                    401,
-                    'Unauthorized',
-                    'Hasło nieprawidłowe lub użytkownik nie istnieje!'
-                );
-            }
-
-
-
-        } catch (err) {
-            console.error('Błąd logowania:', err);
-            return sendProblem(res, 500, 'Internal Server Error', 'Błąd serwera');
         }
 
-    })
+        return res.status(200).json({
+            accessToken: jwt,
+            tokenType: "Bearer",
+            expiresIn: 900
+        })
+
+
+
+
+    } catch (err) {
+        console.error('Błąd logowania:', err);
+        return sendProblem(res, 500, 'Internal Server Error', 'Błąd serwera');
+    }
+
+})
 
 router.post('/logout', authenticateAdmin, async (req, res) => {
     const authHeader = req.headers['authorization'];
     let jwt = authHeader && authHeader.split(' ')[1];
     invalidateToken(jwt)
-    if (jwt){
+    if (jwt) {
         invalidateToken(jwt);
     }
     res.clearCookie('auth_token', {
@@ -107,6 +103,7 @@ router.put('/password', authenticateAdmin, async (req, res) => {
 
     try {
         const { currentPassword, newPassword } = req.body;
+        const passwordComplexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/;
 
         if (!currentPassword || !newPassword) {
             return sendProblem(res, 400, 'Bad Request', 'Wymagane hasło oraz nowe hasło');
@@ -116,8 +113,12 @@ router.put('/password', authenticateAdmin, async (req, res) => {
             return sendProblem(res, 400, 'Bad Request', 'Hasła muszą być ciągami znaków');
         }
 
-        if (newPassword.length < 8) {
-            return sendProblem(res, 422, 'Unprocessable Entity', 'Hasło musi być ciągiem znaków o długości co najmniej 8');
+        if (!passwordComplexityRegex.test(newPassword)) {
+            return sendProblem(res, 422, 'Unprocessable Entity', 'Nowe hasło musi zawierać co najmniej jedną wielką literę, małą literę, cyfrę oraz znak specjalny');
+        }
+
+        if (currentPassword === newPassword) {
+            return sendProblem(res, 422, 'Unprocessable Entity', 'Nowe hasło musi różnić się od dotychczasowego');
         }
 
         const adminId = req.user?.id
@@ -140,7 +141,13 @@ router.put('/password', authenticateAdmin, async (req, res) => {
             return sendProblem(res, 403, 'Forbidden', 'Błędne bieżące hasło');
         }
 
-        const newPasswordHash = await argon2.hash(newPassword)
+        const newPasswordHash = await argon2.hash(newPassword, {
+            type: argon2.argon2id,
+            memoryCost: 65536,
+            timeCost: 3,
+            parallelism: 4
+        })
+
 
         const query2 = 'UPDATE admins SET password_hash = $1 WHERE id = $2'
         const result2 = await db.query(query2, [newPasswordHash, adminId])
@@ -149,6 +156,11 @@ router.put('/password', authenticateAdmin, async (req, res) => {
             return sendProblem(res, 500, 'Internal Server Error', 'Nie udało się zaktualizować hasła');
         }
 
+        const currentAuthHeader = req.headers['authorization'];
+        if (currentAuthHeader) {
+            const currentJwt = currentAuthHeader.split(' ')[1];
+            invalidateToken(currentJwt);
+        }
         return res.status(204).send();
 
 

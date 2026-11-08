@@ -94,9 +94,7 @@ jobs:
           
             git pull origin main
             
-            if [ -d "certs" ]; then
-            chmod 644 certs/*.pem 2>/dev/null || true
-            fi
+            sudo chmod 644 certs/privkey.pem certs/fullchain.pem
 
             docker compose up -d --build --remove-orphans
             
