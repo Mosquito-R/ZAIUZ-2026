@@ -4,7 +4,7 @@ import DataTable from './components/DataTable';
 import Filters from './components/Filters';
 import LoginModal from './components/LoginModal';
 import ChangePasswordModal from './components/ChangePasswordModal';
-import AdminSeries from './components/AdminSeries';
+import AdminPanel from './components/AdminPanel';
 import { seriesApi, measurementsApi, authApi, getToken } from './api/client';
 
 
@@ -51,13 +51,13 @@ export default function App() {
     };
 
     const loadSeries = async () => {
-    try {
-      const data = await seriesApi.getAll();
-      setSeries(data);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+        try {
+            const data = await seriesApi.getAll();
+            setSeries(data);
+        } catch (err) {
+            setError(err.message);
+        }
+    };
 
     return (
         <div className="container">
@@ -69,10 +69,10 @@ export default function App() {
                             <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>Admin</span>
                             <button
                                 type="button"
-                                className={`btn ${currentScreen === 'series' ? 'btn-secondary' : ''}`}
-                                onClick={() => setCurrentScreen(currentScreen === 'series' ? 'main' : 'series')}
+                                className={`btn ${currentScreen === 'admin' ? 'btn-secondary' : ''}`}
+                                onClick={() => setCurrentScreen(currentScreen === 'admin' ? 'main' : 'admin')}
                             >
-                                {currentScreen === 'series' ? 'Widok główny' : 'Zarządzaj seriami'}
+                                {currentScreen === 'admin' ? 'Widok główny' : 'Panel Admina'}
                             </button>
                             <button type="button" className="btn btn-secondary" onClick={() => setIsPasswordOpen(true)}>
                                 Zmień hasło
@@ -90,8 +90,8 @@ export default function App() {
             </header>
 
             <main>
-                {currentScreen === 'series' && isLoggedIn ? (
-                    <AdminSeries
+                {currentScreen === 'admin' && isLoggedIn ? (
+                    <AdminPanel
                         seriesList={series}
                         onSeriesUpdated={loadSeries}
                         onBack={() => setCurrentScreen('main')}

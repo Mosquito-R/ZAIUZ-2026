@@ -99,9 +99,6 @@ export default function AdminSeries({ seriesList, onSeriesUpdated, onBack }) {
     <div className="admin-screen no-print">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h2>Zarządzanie seriami pomiarowymi</h2>
-        <button type="button" className="btn btn-secondary" onClick={onBack}>
-          ← Powrót do widoku głównego
-        </button>
       </div>
 
       {error && <div className="error-message" role="alert">{error}</div>}
