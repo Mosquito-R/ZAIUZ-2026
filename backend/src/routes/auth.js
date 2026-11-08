@@ -1,6 +1,7 @@
-const { SignJWT, decodeJwt } = require("jose");
+const { SignJWT} = require("jose");
 const argon2 = require("argon2");
 const express = require('express');
+const crypto = require('crypto');
 const db = require('../config/db');
 const { sendProblem } = require('../utils/error')
 const router = express.Router()
@@ -38,6 +39,7 @@ router.post('/login', async (req, res) => {
             const secret = new TextEncoder().encode(process.env.JWT_SECRET)
             const jwt = await new SignJWT({ id: admin.id, username: username })
                 .setProtectedHeader({ alg: 'HS256' })
+                .setJti(crypto.randomUUID())
                 .setIssuedAt()
                 .setExpirationTime('1h')
                 .sign(secret);
