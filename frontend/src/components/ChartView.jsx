@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Chart as ChartJS,
   TimeScale,
@@ -22,9 +21,8 @@ ChartJS.register(
   Legend
 );
 
-//POINT_STYLES = ['circle', 'triangle', 'rect', 'rectRot', 'star', 'crossRot'];
 
-export default function ChartView({ series, measurements, selectedId }) {
+export default function ChartView({ series, measurements, selectedId, onSelectMeasurement}) {
   const datasets = series.map((s) => {
     const seriesMeasurements = measurements.filter((m) => m.seriesId === s.id);
 
@@ -47,6 +45,17 @@ export default function ChartView({ series, measurements, selectedId }) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+     onClick: (event, elements) => {
+      if (elements && elements.length > 0) {
+        const firstPoint = elements[0];
+        const datasetIndex = firstPoint.datasetIndex;
+        const index = firstPoint.index;
+        const clickedPoint = datasets[datasetIndex]?.data[index];
+        if (clickedPoint && clickedPoint.id && typeof onSelectMeasurement === 'function') {
+          onSelectMeasurement(clickedPoint.id);
+        }
+      }
+    },
     plugins: {
       legend: {
         labels: {

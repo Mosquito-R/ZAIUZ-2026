@@ -112,6 +112,7 @@ export default function App() {
                                         series={series.filter((s) => measurements.some((m) => m.seriesId === s.id))}
                                         measurements={measurements}
                                         selectedId={selectedMeasurementId}
+                                        onSelectMeasurement={(id) => setSelectedMeasurementId(id)}
                                     />
                                 </section>
 
