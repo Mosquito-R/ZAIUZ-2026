@@ -2,6 +2,8 @@
 
 A containerized web platform for collecting, managing, and visualizing IoT sensor telemetry data.
 
+> Developed as a final project for the **Zaawansowane Aplikacje Internetowe** course (semester 26Z).
+
 ---
 
 ## Quick Start (Local Setup)
